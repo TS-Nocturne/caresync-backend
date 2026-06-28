@@ -14,5 +14,7 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         sync: false
+      - key: TRUSTED_HOSTS
+        sync: false
       - key: PYTHON_VERSION
         value: 3.11.5
