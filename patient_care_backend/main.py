@@ -6,12 +6,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
+from patient_care_backend.brain.baseline_graph import get_baseline_graph
 from patient_care_backend.brain.graph import get_brain_graph
 from patient_care_backend.config import get_settings
 from patient_care_backend.schemas import (
     AssessmentRequest,
     AssessmentResult,
     AvailabilityRequest,
+    BaselineRequest,
+    BaselineResult,
     DecisionRequest,
 )
 from patient_care_backend.services.context_indexer import build_context_indexer
@@ -102,6 +105,7 @@ def assess_patient(request: AssessmentRequest) -> AssessmentResult:
     initial_state = {
         "patient_id": request.patient_id,
         "vitals": request.vitals,
+        "patient_baseline": request.patient_baseline,
         "symptoms": request.symptoms,
         "current_medications": request.current_medications,
         "family_decision": None,
@@ -111,6 +115,21 @@ def assess_patient(request: AssessmentRequest) -> AssessmentResult:
     get_brain_graph().invoke(initial_state, _config(thread_id))
     state = _current_state(thread_id)
     return AssessmentResult(thread_id=thread_id, status=_status(state), state=state)
+
+
+@app.post("/brain/baseline", response_model=BaselineResult, dependencies=[Depends(require_internal_api_key)])
+def calculate_patient_baseline(request: BaselineRequest) -> BaselineResult:
+    thread_id = str(uuid4())
+    initial_state = {
+        "patient_id": request.patient_id,
+        "vitals_history": request.vitals_history,
+        "k": request.k,
+    }
+    config = _config(thread_id)
+    get_baseline_graph().invoke(initial_state, config)
+    snapshot = get_baseline_graph().get_state(config)
+    state = dict(snapshot.values or {})
+    return BaselineResult(thread_id=thread_id, status="completed", state=state)
 
 
 @app.post(
@@ -176,7 +195,7 @@ def export_anonymized_training(records: list[dict]) -> dict:
 
 @app.post("/brain/index-patient", dependencies=[Depends(require_internal_api_key)])
 def index_patient_context(profile: dict) -> dict:
-    """Upsert patient medical context chunks into Pinecone for RAG."""
+    """Upsert patient care-context chunks into Pinecone for RAG."""
     indexer = build_context_indexer(get_settings())
     return indexer.index_patient(profile)
 

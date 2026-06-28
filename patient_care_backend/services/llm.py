@@ -7,7 +7,7 @@ from patient_care_backend.services.anonymizer import anonymize_patient_state
 
 class SymptomEvaluator(Protocol):
     def evaluate(self, state: PatientState) -> RiskAssessment:
-        """Evaluate symptoms, vitals, and retrieved context."""
+        """Summarize symptoms, vitals, and retrieved context for human review."""
 
 
 class FallbackSymptomEvaluator:
@@ -37,27 +37,27 @@ class FallbackSymptomEvaluator:
     def evaluate(self, state: PatientState) -> RiskAssessment:
         symptoms = {symptom.strip().lower() for symptom in state.get("symptoms", [])}
         vitals = state.get("vitals", {})
+        baseline = state.get("patient_baseline", {})
 
         risk = RiskLevel.NORMAL
-        if symptoms & self.critical_terms or self._spo2(vitals) < 92:
+        if symptoms & self.critical_terms or self._spo2(vitals) < self._critical_spo2_threshold(baseline):
             risk = RiskLevel.CRITICAL
         elif symptoms & self.warning_terms or self._temperature(vitals) >= 38:
             risk = RiskLevel.WARNING
 
         if risk == RiskLevel.CRITICAL:
             actions = [
-                "contact_emergency_service",
-                "prepare_hospital_transfer",
-                "skip_evening_medication",
-                "telemed",
+                "notify_care_team_for_review",
+                "show_emergency_contact_options",
+                "record_information_flag",
             ]
-            analysis = "พบสัญญาณที่อาจฉุกเฉิน ควรแจ้งแพทย์หรือพยาบาลทันที"
+            analysis = "พบข้อมูลที่ควรให้ผู้ดูแลตรวจสอบด่วน ระบบไม่ได้วินิจฉัยหรือสั่งการรักษา"
         elif risk == RiskLevel.WARNING:
-            actions = ["notify_family", "call_nurse", "monitor_vitals"]
-            analysis = "อาการต้องติดตามใกล้ชิด แนะนำให้ครอบครัวพิจารณาก่อนดำเนินการขั้นถัดไป"
+            actions = ["notify_family_for_review", "request_caregiver_review", "record_information_flag"]
+            analysis = "มีข้อมูลที่ควรติดตามและส่งให้ผู้ดูแลพิจารณา ไม่ใช่คำวินิจฉัยหรือคำสั่งรักษา"
         else:
-            actions = ["continue_monitoring", "record_symptoms"]
-            analysis = "ยังไม่พบสัญญาณเสี่ยงสูงจากระบบประเมินอัตโนมัติ"
+            actions = ["record_observation", "continue_routine_logging"]
+            analysis = "ข้อมูลล่าสุดอยู่ในช่วงที่ระบบติดตามไว้ ควรใช้ประกอบการดูแลตามปกติโดยมนุษย์"
 
         return RiskAssessment(
             risk_level=risk,
@@ -71,6 +71,14 @@ class FallbackSymptomEvaluator:
             return float(vitals.get("spo2", 100))
         except (TypeError, ValueError):
             return 100
+
+    @staticmethod
+    def _critical_spo2_threshold(baseline: dict[str, Any]) -> float:
+        try:
+            baseline_spo2 = float(baseline.get("baseline_oxygen_sat"))
+        except (TypeError, ValueError):
+            return 92
+        return max(50, min(92, baseline_spo2 - 4))
 
     @staticmethod
     def _temperature(vitals: dict[str, Any]) -> float:
@@ -96,17 +104,20 @@ class GeminiSymptomEvaluator:
             [
                 (
                     "system",
-                    "You are an elder-care risk assessment assistant. "
-                    "Assess urgency and suggest options. Do not diagnose disease. "
-                    "Return concise, family-readable guidance.",
+                    "You are an elder-care care-coordination summarization assistant. "
+                    "Do not diagnose disease, determine treatment, triage, prescribe, adjust medication, "
+                    "or direct transfer decisions. "
+                    "Use patient-specific baseline vitals before general population thresholds. "
+                    "Return concise, family-readable observations and suggest human review only.",
                 ),
                 (
                     "human",
-                    "Assess this patient report.\n"
+                    "Summarize this patient report for caregiver review.\n"
                     "- Symptoms: {symptoms}\n"
                     "- Vitals: {vitals}\n"
+                    "- Patient-specific baseline vitals: {patient_baseline}\n"
                     "- Current medications: {medications}\n"
-                    "- Retrieved medical context: {context}\n",
+                    "- Retrieved care context: {context}\n",
                 ),
             ]
         )
@@ -125,6 +136,7 @@ class GeminiSymptomEvaluator:
             {
                 "symptoms": safe.get("symptoms", []),
                 "vitals": safe.get("vitals", {}),
+                "patient_baseline": safe.get("patient_baseline", {}),
                 "medications": safe.get("current_medications", []),
                 "context": safe.get("retrieved_medical_context", ""),
             }

@@ -46,7 +46,7 @@ class PineconePatientContextRetriever:
         query = (
             f"Symptoms: {', '.join(state.get('symptoms', []))}. "
             f"Medications: {', '.join(state.get('current_medications', []))}. "
-            f"Patient context lookup for risk assessment."
+            f"Patient context lookup for care-coordination review."
         )
         vector = self._embeddings.embed_query(query)
         patient_results = self._index.query(

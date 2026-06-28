@@ -14,14 +14,13 @@ class LoggingDecisionExecutor:
         if not decision:
             return ["no_family_decision_provided"]
 
-        if decision in {"prepare_hospital_transfer", "contact_emergency_service"}:
+        if decision in {"request_professional_review", "contact_emergency_services_user_initiated"}:
             return [
-                "hold_non_critical_schedule",
                 "notify_care_team",
-                "record_family_hospital_transfer_decision",
+                "record_family_requested_external_review",
             ]
 
-        if decision == "call_nurse":
-            return ["notify_assigned_nurse", "record_family_nurse_call_decision"]
+        if decision in {"call_nurse", "notify_nurse", "request_caregiver_review"}:
+            return ["notify_assigned_caregiver", "record_family_caregiver_contact_decision"]
 
         return [f"record_family_decision:{decision}"]

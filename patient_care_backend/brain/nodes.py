@@ -5,7 +5,6 @@ from patient_care_backend.services.vector_store import PatientContextRetriever
 from patient_care_backend.services.vital_validation import (
     issues_to_dicts,
     validate_vitals,
-    validation_needs_confirmation,
 )
 
 

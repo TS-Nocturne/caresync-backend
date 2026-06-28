@@ -1,4 +1,4 @@
-"""Build and upsert patient medical context chunks into Pinecone for RAG."""
+"""Build and upsert patient care-context chunks into Pinecone for RAG."""
 
 from __future__ import annotations
 
@@ -77,6 +77,28 @@ def build_patient_context_chunks(profile: dict[str, Any]) -> list[dict[str, str]
             }
         )
 
+    dynamic_parts = []
+    for lower_key, upper_key, label in [
+        ("baseline_systolic_lower", "baseline_systolic_upper", "systolic"),
+        ("baseline_diastolic_lower", "baseline_diastolic_upper", "diastolic"),
+        ("baseline_temperature_lower", "baseline_temperature_upper", "temperature"),
+        ("baseline_heart_rate_lower", "baseline_heart_rate_upper", "heart rate"),
+        ("baseline_oxygen_sat_min", "baseline_oxygen_sat_max", "SpO2"),
+    ]:
+        if profile.get(lower_key) is not None and profile.get(upper_key) is not None:
+            dynamic_parts.append(f"{label} {profile[lower_key]}-{profile[upper_key]}")
+    if dynamic_parts or profile.get("baseline_insight_text"):
+        chunks.append(
+            {
+                "category": "dynamic_baseline",
+                "text": (
+                    "Dynamic patient-specific thresholds from recent vitals: "
+                    f"{', '.join(dynamic_parts)}. "
+                    f"Latest insight: {profile.get('baseline_insight_text') or '-'}"
+                ),
+            }
+        )
+
     if profile.get("weight_kg") and profile.get("height_cm"):
         h_m = profile["height_cm"] / 100
         bmi = round(profile["weight_kg"] / (h_m * h_m), 1)
@@ -121,12 +143,22 @@ def build_patient_context_chunks(profile: dict[str, Any]) -> list[dict[str, str]
     for med in profile.get("medications") or []:
         times = ", ".join(med.get("time_of_day") or []) or med.get("schedule_time", "")
         instruction = med.get("instruction") or ""
+        dose = " ".join(
+            str(part)
+            for part in [med.get("dose_amount"), med.get("dose_unit")]
+            if part not in (None, "")
+        ) or med.get("dosage", "")
+        prn = " PRN/as-needed." if med.get("is_prn") else ""
+        frequency = med.get("frequency") or "DAILY"
+        indication = f" Indication: {med.get('indication')}." if med.get("indication") else ""
+        appearance = f" Appearance: {med.get('appearance')}." if med.get("appearance") else ""
         chunks.append(
             {
                 "category": "medication",
                 "text": (
-                    f"Regular medication: {med.get('name')} {med.get('dosage')} "
-                    f"at {times}. {instruction}".strip()
+                    f"Medication: {med.get('name')} {med.get('strength') or ''} {dose} "
+                    f"at {times}. Frequency: {frequency}.{prn}{indication}{appearance} "
+                    f"{instruction}".strip()
                 ),
             }
         )

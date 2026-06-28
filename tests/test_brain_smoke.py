@@ -27,7 +27,7 @@ def test_warning_assessment_waits_for_human_and_resumes():
 
     resumed = graph.get_state(config).values
     assert resumed["family_decision"] == "call_nurse"
-    assert "notify_assigned_nurse" in resumed["executed_actions"]
+    assert "notify_assigned_caregiver" in resumed["executed_actions"]
 
 
 def test_normal_assessment_completes_without_human_pause():

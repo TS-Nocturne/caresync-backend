@@ -22,6 +22,7 @@ class ValidationIssueDict(TypedDict, total=False):
 class PatientState(TypedDict, total=False):
     patient_id: str
     vitals: dict[str, Any]
+    patient_baseline: dict[str, Any]
     symptoms: list[str]
     current_medications: list[str]
     retrieved_medical_context: str
@@ -36,9 +37,28 @@ class PatientState(TypedDict, total=False):
     errors: list[str]
 
 
+class VitalHistoryPoint(TypedDict, total=False):
+    measured_at: str
+    systolic: float | None
+    diastolic: float | None
+    temperature: float | None
+    heart_rate: float | None
+    oxygen_sat: float | None
+
+
+class BaselineState(TypedDict, total=False):
+    patient_id: str
+    vitals_history: list[VitalHistoryPoint]
+    k: float
+    calculated_thresholds: dict[str, float | None]
+    ai_insight_text: str
+    errors: list[str]
+
+
 class AssessmentRequest(BaseModel):
     patient_id: str = Field(min_length=1, max_length=128)
     vitals: dict[str, Any] = Field(default_factory=dict)
+    patient_baseline: dict[str, Any] = Field(default_factory=dict)
     symptoms: list[str] = Field(default_factory=list, max_length=25)
     current_medications: list[str] = Field(default_factory=list, max_length=100)
     thread_id: str | None = Field(default=None, max_length=128)
@@ -59,6 +79,25 @@ class AssessmentRequest(BaseModel):
             raise ValueError("Too many vital fields")
         return values
 
+    @field_validator("patient_baseline")
+    @classmethod
+    def limit_patient_baseline(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if len(values) > 30:
+            raise ValueError("Too many baseline fields")
+        return values
+
+
+class BaselineRequest(BaseModel):
+    patient_id: str = Field(min_length=1, max_length=128)
+    vitals_history: list[dict[str, Any]] = Field(default_factory=list, max_length=500)
+    k: float = Field(default=1.5, ge=0.5, le=3.0)
+
+
+class BaselineResult(BaseModel):
+    thread_id: str
+    status: Literal["completed"]
+    state: BaselineState
+
 
 class DecisionRequest(BaseModel):
     family_decision: str = Field(min_length=1, max_length=500)
@@ -69,7 +108,7 @@ class AvailabilityRequest(BaseModel):
     day: int = Field(ge=0, le=6)
     start_hour: int = Field(ge=0, le=23)
     end_hour: int = Field(ge=1, le=24)
-    note: str = Field(default="available_for_doctor_visit", max_length=500)
+    note: str = Field(default="available_for_family_follow_up", max_length=500)
 
 
 class AssessmentResult(BaseModel):
