@@ -72,7 +72,10 @@ def test_warning_assessment_summarizes_actual_symptoms_not_generic_disclaimer():
     assert state["risk_level"] == "warning"
     assert "สับสน" in state["ai_analysis"]
     assert "ออกจากบ้าน" in state["ai_analysis"]
-    assert "เฝ้าระวัง" in state["ai_analysis"]
+    assert "ชวนคุย" in state["ai_analysis"]
+    assert "เช็กประตู" in state["ai_analysis"]
+    assert ";" not in state["ai_analysis"]
+    assert "หลุดจากเกณฑ์หลัก" not in state["ai_analysis"]
     assert "ไม่ใช่คำวินิจฉัย" not in state["ai_analysis"]
 
 

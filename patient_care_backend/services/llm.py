@@ -70,38 +70,41 @@ class FallbackSymptomEvaluator:
         vital_findings = self._vital_findings(vitals, baseline)
         context_findings = self._context_findings(recent_context)
 
-        findings = []
+        details = []
         if vital_findings:
-            findings.append(f"ค่าสถิติร่างกายที่ควรทบทวน: {', '.join(vital_findings)}")
+            details.append(f"วันนี้มีค่าที่อยากให้ช่วยดูซ้ำ คือ {self._join_naturally(vital_findings)}")
         elif vitals:
-            findings.append("ค่าสถิติร่างกายล่าสุดยังไม่พบค่าที่หลุดจากเกณฑ์หลัก")
+            details.append("ค่าสัญญาณชีพโดยรวมยังดูนิ่งอยู่")
 
         if symptoms:
-            findings.append(f"มีอาการ/บันทึกล่าสุด: {', '.join(symptoms[:6])}")
+            details.append(f"แต่มีบันทึกว่า {self._join_naturally(symptoms[:6])}")
         if context_findings:
-            findings.append(f"บริบทการดูแลล่าสุด: {context_findings}")
+            details.append(context_findings)
 
-        if not findings:
-            return "ยังไม่พบอาการผิดปกติหรือค่าสถิติร่างกายที่ต้องส่งต่อเป็นพิเศษ ผู้ดูแลกะต่อไปควรติดตามตามรอบปกติ"
+        if not details:
+            return "กะนี้ยังไม่มีอาการหรือค่าสัญญาณชีพที่น่าห่วงเป็นพิเศษครับ กะต่อไปติดตามตามรอบปกติได้เลย"
 
         watch_items = []
         lowered = " ".join([*symptoms, recent_context]).lower()
         if any(term in lowered for term in ["confusion", "สับสน", "wandering", "ออกจากบ้าน", "พลัดหลง"]):
-            watch_items.append("เฝ้าระวังความสับสน การเดินออกนอกพื้นที่ หรือการพลัดหลง")
+            watch_items.append("ชวนคุยให้อยู่กับปัจจุบัน ดูเรื่องการเดินออกนอกพื้นที่ และเช็กประตูให้เรียบร้อย")
         if any(term in lowered for term in ["fall", "หกล้ม", "ล้ม", "dizziness", "เวียนหัว"]):
-            watch_items.append("เฝ้าระวังการหกล้มและช่วยพยุงเมื่อลุกเดิน")
+            watch_items.append("ช่วยดูตอนลุกเดินและจัดพื้นที่ให้เดินสะดวก")
         if any(term in lowered for term in ["fever", "มีไข้", "vomiting", "อาเจียน"]):
-            watch_items.append("ติดตามไข้ อาการอ่อนเพลีย การดื่มน้ำ และอาการแย่ลง")
+            watch_items.append("ติดตามไข้ การดื่มน้ำ อาการอ่อนเพลีย และอาการที่แย่ลง")
         if self._spo2(vitals) < self._critical_spo2_threshold(baseline):
-            watch_items.append("ตรวจซ้ำค่าออกซิเจนปลายนิ้วและอาการหายใจลำบาก")
+            watch_items.append("วัดออกซิเจนปลายนิ้วซ้ำ และสังเกตว่าหายใจเหนื่อยหรือไม่")
         if self._temperature(vitals) >= 38:
-            watch_items.append("ติดตามอุณหภูมิซ้ำและอาการร่วม")
+            watch_items.append("วัดไข้ซ้ำตามรอบ และดูว่ามีอาการอื่นร่วมด้วยไหม")
 
         if not watch_items:
-            watch_items.append("ส่งต่อให้ผู้ดูแลทบทวนรายละเอียดและติดตามการเปลี่ยนแปลงในกะถัดไป")
+            watch_items.append("อ่านบันทึกนี้ประกอบและช่วยดูว่ามีอะไรเปลี่ยนไปในกะถัดไปไหม")
 
-        prefix = "พบข้อมูลระดับวิกฤตที่ต้องให้ผู้ดูแลตรวจสอบทันที" if risk == RiskLevel.CRITICAL else "พบข้อมูลที่ควรส่งต่อให้ผู้ดูแลกะถัดไป"
-        return f"{prefix}: {'; '.join(findings[:3])}. ควร{'; '.join(watch_items[:2])}"
+        detail_text = " ".join(details[:3])
+        watch_text = self._join_naturally(watch_items[:2])
+        if risk == RiskLevel.CRITICAL:
+            return f"กะนี้มีเรื่องสำคัญที่อยากให้ช่วยดูต่อทันทีนะครับ {detail_text} รบกวนช่วย{watch_text}ด้วยครับ"
+        return f"ร่างกายโดยรวมยังพอติดตามต่อได้ครับ {detail_text} รบกวนกะต่อไปช่วย{watch_text}ด้วยนะครับ"
 
     def _vital_findings(self, vitals: dict[str, Any], baseline: dict[str, Any]) -> list[str]:
         findings: list[str] = []
@@ -111,7 +114,7 @@ class FallbackSymptomEvaluator:
         if temp >= 38:
             findings.append(f"อุณหภูมิ {temp:g}°C")
         if spo2 < self._critical_spo2_threshold(baseline):
-            findings.append(f"SpO2 {spo2:g}%")
+            findings.append(f"ออกซิเจนปลายนิ้ว {spo2:g}%")
 
         systolic = self._float_value(vitals, "systolic")
         diastolic = self._float_value(vitals, "diastolic")
@@ -145,11 +148,19 @@ class FallbackSymptomEvaluator:
         cleaned = []
         for line in lines[:3]:
             cleaned.append(
-                line.replace("Current submitted abnormal symptoms:", "อาการที่บันทึก").replace(
-                    "Recent symptom", "อาการก่อนหน้า"
-                )
+                line.replace("Current submitted abnormal symptoms:", "ในบันทึกล่าสุดมี")
+                .replace("Recent symptom", "ก่อนหน้านี้มีบันทึก")
+                .replace("; notes:", " และมีหมายเหตุว่า")
             )
-        return "; ".join(cleaned)
+        return " ".join(cleaned)
+
+    @staticmethod
+    def _join_naturally(items: list[str]) -> str:
+        if len(items) <= 1:
+            return items[0] if items else ""
+        if len(items) == 2:
+            return f"{items[0]} และ{items[1]}"
+        return f"{', '.join(items[:-1])} และ{items[-1]}"
 
     @staticmethod
     def _float_value(values: dict[str, Any], key: str) -> float | None:
@@ -200,12 +211,17 @@ class GeminiSymptomEvaluator:
                 (
                     "system",
                     "You are an elder-care care-coordination handoff assistant. "
+                    "Act like a senior caregiver handing over the shift to a trusted coworker. "
                     "Write a concrete handoff note for the next caregiver shift in Thai, 1-2 concise sentences. "
+                    "Use natural, warm, professional spoken Thai that feels like a coworker handoff. "
+                    "Keep the tone calm and practical so family members feel informed without unnecessary anxiety. "
                     "You must summarize what actually happened from symptoms, vitals, recent notes, pain logs, "
                     "PRN/as-needed medication events, and retrieved patient context. "
                     "Mention stable vitals only when useful, but do not call the patient normal if abnormal symptoms, "
                     "pain, PRN/as-needed medication use, or relevant context exists. "
-                    "State what the next caregiver should watch, check, or review. "
+                    "State what the next caregiver should watch, check, or review in a way they can act on immediately. "
+                    "Avoid robotic log-style wording, semicolons, colon-heavy formatting, and technical jargon unless the "
+                    "specific vital value is important for caregiver handoff. "
                     "Do not output a generic disclaimer, legal warning, diagnosis, treatment instruction, triage order, "
                     "medication adjustment, or transfer decision. "
                     "The ai_analysis field must contain patient-specific facts from the input; it must not be only "
