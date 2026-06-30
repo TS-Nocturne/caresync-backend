@@ -25,6 +25,7 @@ class PatientState(TypedDict, total=False):
     patient_baseline: dict[str, Any]
     symptoms: list[str]
     current_medications: list[str]
+    recent_care_context: str
     retrieved_medical_context: str
     validation_issues: list[ValidationIssueDict]
     validation_confirmed: bool
@@ -61,6 +62,7 @@ class AssessmentRequest(BaseModel):
     patient_baseline: dict[str, Any] = Field(default_factory=dict)
     symptoms: list[str] = Field(default_factory=list, max_length=25)
     current_medications: list[str] = Field(default_factory=list, max_length=100)
+    recent_care_context: str = Field(default="", max_length=5000)
     thread_id: str | None = Field(default=None, max_length=128)
     validation_confirmed: bool = False
 
@@ -71,6 +73,11 @@ class AssessmentRequest(BaseModel):
         if any(len(value) > 500 for value in cleaned):
             raise ValueError("Text items must be 500 characters or fewer")
         return cleaned
+
+    @field_validator("recent_care_context")
+    @classmethod
+    def limit_recent_care_context(cls, value: str) -> str:
+        return value.strip()
 
     @field_validator("vitals")
     @classmethod

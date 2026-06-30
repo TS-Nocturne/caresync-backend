@@ -42,7 +42,7 @@ class FallbackSymptomEvaluator:
         risk = RiskLevel.NORMAL
         if symptoms & self.critical_terms or self._spo2(vitals) < self._critical_spo2_threshold(baseline):
             risk = RiskLevel.CRITICAL
-        elif symptoms & self.warning_terms or self._temperature(vitals) >= 38:
+        elif symptoms or symptoms & self.warning_terms or self._temperature(vitals) >= 38:
             risk = RiskLevel.WARNING
 
         if risk == RiskLevel.CRITICAL:
@@ -108,6 +108,10 @@ class GeminiSymptomEvaluator:
                     "Do not diagnose disease, determine treatment, triage, prescribe, adjust medication, "
                     "or direct transfer decisions. "
                     "Use patient-specific baseline vitals before general population thresholds. "
+                    "You must consider current symptoms, recent abnormal symptoms, pain logs, and PRN/as-needed "
+                    "medication events from the last 24 hours. If any current/recent abnormal symptom exists, "
+                    "or a PRN/as-needed medication was given recently, do not describe the patient as normal; "
+                    "state that vitals may be stable but symptoms/PRN use require caregiver review. "
                     "Return concise, family-readable observations and suggest human review only.",
                 ),
                 (
@@ -117,6 +121,7 @@ class GeminiSymptomEvaluator:
                     "- Vitals: {vitals}\n"
                     "- Patient-specific baseline vitals: {patient_baseline}\n"
                     "- Current medications: {medications}\n"
+                    "- Recent care context from the last 24 hours: {recent_care_context}\n"
                     "- Retrieved care context: {context}\n",
                 ),
             ]
@@ -138,6 +143,7 @@ class GeminiSymptomEvaluator:
                 "vitals": safe.get("vitals", {}),
                 "patient_baseline": safe.get("patient_baseline", {}),
                 "medications": safe.get("current_medications", []),
+                "recent_care_context": safe.get("recent_care_context", ""),
                 "context": safe.get("retrieved_medical_context", ""),
             }
         )

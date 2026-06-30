@@ -30,6 +30,27 @@ def test_warning_assessment_waits_for_human_and_resumes():
     assert "notify_assigned_caregiver" in resumed["executed_actions"]
 
 
+def test_symptom_assessment_waits_for_human_even_with_stable_vitals():
+    graph = build_brain_graph()
+    config = {"configurable": {"thread_id": "test-symptom-warning"}}
+
+    graph.invoke(
+        {
+            "patient_id": "p-002",
+            "vitals": {"temperature_c": 36.7, "spo2": 98},
+            "symptoms": ["mild tiredness"],
+            "current_medications": [],
+            "family_decision": None,
+            "validation_confirmed": True,
+        },
+        config,
+    )
+
+    state = graph.get_state(config).values
+    assert state["risk_level"] == "warning"
+    assert "executed_actions" not in state
+
+
 def test_normal_assessment_completes_without_human_pause():
     graph = build_brain_graph()
     config = {"configurable": {"thread_id": "test-normal"}}
@@ -38,7 +59,7 @@ def test_normal_assessment_completes_without_human_pause():
         {
             "patient_id": "p-002",
             "vitals": {"temperature_c": 36.7, "spo2": 98},
-            "symptoms": ["mild tiredness"],
+            "symptoms": [],
             "current_medications": [],
             "family_decision": None,
             "validation_confirmed": True,
