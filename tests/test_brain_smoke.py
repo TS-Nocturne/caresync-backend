@@ -51,6 +51,31 @@ def test_symptom_assessment_waits_for_human_even_with_stable_vitals():
     assert "executed_actions" not in state
 
 
+def test_warning_assessment_summarizes_actual_symptoms_not_generic_disclaimer():
+    graph = build_brain_graph()
+    config = {"configurable": {"thread_id": "test-specific-handoff-note"}}
+
+    graph.invoke(
+        {
+            "patient_id": "p-005",
+            "vitals": {"temperature_c": 36.7, "spo2": 98},
+            "symptoms": ["สับสน", "พยายามออกจากบ้านช่วงบ่าย"],
+            "current_medications": [],
+            "recent_care_context": "Current submitted abnormal symptoms: สับสน; notes: พยายามออกจากบ้านช่วงบ่าย",
+            "family_decision": None,
+            "validation_confirmed": True,
+        },
+        config,
+    )
+
+    state = graph.get_state(config).values
+    assert state["risk_level"] == "warning"
+    assert "สับสน" in state["ai_analysis"]
+    assert "ออกจากบ้าน" in state["ai_analysis"]
+    assert "เฝ้าระวัง" in state["ai_analysis"]
+    assert "ไม่ใช่คำวินิจฉัย" not in state["ai_analysis"]
+
+
 def test_normal_assessment_completes_without_human_pause():
     graph = build_brain_graph()
     config = {"configurable": {"thread_id": "test-normal"}}
