@@ -13,36 +13,57 @@ class SymptomEvaluator(Protocol):
 class FallbackSymptomEvaluator:
     critical_terms = {
         "chest pain",
+        "chest pressure",
+        "เจ็บหน้าอก",
+        "แน่นหน้าอก",
         "เจ็บหน้าอก",
         "severe bleeding",
         "เลือดออกมาก",
+        "เลือดออกมาก",
         "unconscious",
         "หมดสติ",
+        "หมดสติ",
         "shortness of breath",
+        "หายใจลำบาก",
         "หายใจลำบาก",
     }
     warning_terms = {
         "fever",
         "มีไข้",
+        "มีไข้",
         "dizziness",
+        "เวียนหัว",
         "เวียนหัว",
         "vomiting",
         "อาเจียน",
+        "อาเจียน",
         "confusion",
         "สับสน",
+        "สับสน",
         "fall",
+        "หกล้ม",
         "หกล้ม",
     }
 
     def evaluate(self, state: PatientState) -> RiskAssessment:
         symptoms = {symptom.strip().lower() for symptom in state.get("symptoms", [])}
+        recent_context = (state.get("recent_care_context") or "").lower()
+        medication_context = " ".join(state.get("current_medications", [])).lower()
+        assessment_text = " ".join([*symptoms, recent_context, medication_context])
         vitals = state.get("vitals", {})
         baseline = state.get("patient_baseline", {})
 
         risk = RiskLevel.NORMAL
-        if symptoms & self.critical_terms or self._spo2(vitals) < self._critical_spo2_threshold(baseline):
+        if (
+            any(term in assessment_text for term in self.critical_terms)
+            or self._spo2(vitals) < self._critical_spo2_threshold(baseline)
+        ):
             risk = RiskLevel.CRITICAL
-        elif symptoms or symptoms & self.warning_terms or self._temperature(vitals) >= 38:
+        elif (
+            symptoms
+            or any(term in assessment_text for term in self.warning_terms)
+            or self._temperature(vitals) >= 38
+        ):
             risk = RiskLevel.WARNING
 
         if risk == RiskLevel.CRITICAL:

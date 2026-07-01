@@ -51,6 +51,34 @@ def test_symptom_assessment_waits_for_human_even_with_stable_vitals():
     assert "executed_actions" not in state
 
 
+def test_chest_pain_notes_and_prn_medication_escalate_to_critical():
+    graph = build_brain_graph()
+    config = {"configurable": {"thread_id": "test-chest-pain-prn-critical"}}
+
+    graph.invoke(
+        {
+            "patient_id": "p-006",
+            "vitals": {"heart_rate": 110, "temperature_c": 36.8, "spo2": 98},
+            "symptoms": ["chest discomfort"],
+            "current_medications": [
+                "Nitroglycerin 0.5 mg PRN/as-needed status GIVEN given at 2026-07-01T10:15:00Z"
+            ],
+            "recent_care_context": (
+                "Current submitted abnormal symptoms: chest discomfort; "
+                "notes: chest pain like pressure, PRN medication given and not improving"
+            ),
+            "family_decision": None,
+            "validation_confirmed": True,
+        },
+        config,
+    )
+
+    state = graph.get_state(config).values
+    assert state["risk_level"] == "critical"
+    assert "chest pain" in state["ai_analysis"]
+    assert "PRN" in state["ai_analysis"] or "medication" in state["ai_analysis"]
+
+
 def test_warning_assessment_summarizes_actual_symptoms_not_generic_disclaimer():
     graph = build_brain_graph()
     config = {"configurable": {"thread_id": "test-specific-handoff-note"}}
